@@ -57,10 +57,16 @@ async function start_p2pktr(keypair: Signer) {
 
   console.log(`Address generated: ${p2pktr_addr}\n`)
 
+  // --------
+  // test #1
+  // --------
+
   console.log('Trying P2PK')
 
+  // instruct Nigiri to send coins to address
   const utxos = await faucetAndWait(p2pktr_addr)
 
+  // create psbt
   const psbt = new Psbt({ network })
 
   psbt.addInput({
@@ -75,9 +81,11 @@ async function start_p2pktr(keypair: Signer) {
     value: utxos[0].value - 150,
   })
 
+  // sign and finalize
   psbt.signInput(0, tweakedSigner)
   psbt.finalizeAllInputs()
 
+  // extract transaction from psbt and broadcast
   await extractAndBroadcast(psbt)
 }
 
@@ -103,20 +111,37 @@ async function start_taptree(keypair: Signer) {
     toXOnly(hash_lock_keypair.publicKey).toString('hex'),
     'OP_CHECKSIG',
   ].join(' ')
-
   const hash_lock_script = script.fromASM(hash_script_asm)
 
+  // Construct script to pay to pubkey
   const p2pk_script_asm = [
     toXOnly(keypair.publicKey).toString('hex'),
     'OP_CHECKSIG',
   ].join(' ')
-
   const p2pk_script = script.fromASM(p2pk_script_asm)
 
   const scriptTree: Taptree = [
     { output: hash_lock_script },
     { output: p2pk_script },
   ]
+
+  const script_p2tr = payments.p2tr({
+    internalPubkey: toXOnly(keypair.publicKey),
+    scriptTree,
+    network,
+  })
+
+  const script_addr = script_p2tr.address ?? ''
+
+  console.log(`Address generated: ${script_addr}\n`)
+
+  // --------
+  // test #2
+  // --------
+
+  console.log('Trying the P2PK path:')
+
+  let utxos = await faucetAndWait(script_addr)
 
   const hash_lock_redeem = {
     output: hash_lock_script,
@@ -127,14 +152,6 @@ async function start_taptree(keypair: Signer) {
     output: p2pk_script,
     redeemVersion: 192,
   }
-
-  const script_p2tr = payments.p2tr({
-    internalPubkey: toXOnly(keypair.publicKey),
-    scriptTree,
-    network,
-  })
-
-  const script_addr = script_p2tr.address ?? ''
 
   const p2pk_p2tr = payments.p2tr({
     internalPubkey: toXOnly(keypair.publicKey),
@@ -150,12 +167,7 @@ async function start_taptree(keypair: Signer) {
     network,
   })
 
-  console.log(`Address generated: ${script_addr}\n`)
-
-  console.log('Trying the P2PK path:')
-
-  let utxos = await faucetAndWait(script_addr)
-
+  // create PSBT
   const p2pk_psbt = new Psbt({ network })
 
   p2pk_psbt.addInput({
@@ -176,13 +188,20 @@ async function start_taptree(keypair: Signer) {
     value: utxos[0].value - 150,
   })
 
+  // sign and finalize
   p2pk_psbt.signInput(0, keypair)
   p2pk_psbt.finalizeAllInputs()
 
+  // extract transaction from psbt and broadcast
   await extractAndBroadcast(p2pk_psbt)
+
+  // --------
+  // test #3
+  // --------
 
   console.log('\nTrying the Hash lock spend path:')
 
+  // instruct Nigiri to send coins to address
   utxos = await faucetAndWait(script_addr)
 
   const tapLeafScript = {
@@ -191,22 +210,25 @@ async function start_taptree(keypair: Signer) {
     controlBlock: hash_lock_p2tr.witness![hash_lock_p2tr.witness!.length - 1],
   }
 
+  // create psbt
   const psbt = new Psbt({ network })
+
   psbt.addInput({
     hash: utxos[0].txid,
     index: utxos[0].vout,
     witnessUtxo: { value: utxos[0].value, script: hash_lock_p2tr.output! },
     tapLeafScript: [tapLeafScript],
   })
+
   psbt.addOutput({
     address: return_address,
     value: utxos[0].value - 150,
   })
 
+  // sign input
   psbt.signInput(0, hash_lock_keypair)
 
   // We have to construct our witness script in a custom finalizer
-
   const customFinalizer = (_inputIndex: number, input: any) => {
     const scriptSolution = [input.tapScriptSig[0].signature, secret_bytes]
     const witness = scriptSolution
@@ -218,9 +240,15 @@ async function start_taptree(keypair: Signer) {
     }
   }
 
+  // finalize input
   psbt.finalizeInput(0, customFinalizer)
 
+  // extract transaction from psbt and broadcast
   await extractAndBroadcast(psbt)
+
+  // --------
+  // test #4
+  // --------
 
   console.log(
     '\nTrying the Hash lock spend path without using the script tree:'
