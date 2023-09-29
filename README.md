@@ -1,6 +1,4 @@
-# taproot-with-bitcoinjs
-
-## A Guide to creating TapRoot Scripts with bitcoinjs-lib
+# A Guide to creating TapRoot Scripts with bitcoinjs-lib
 
 Taproot and Schnorr are upgrades to the Bitcoin protocol designed to enhance the privacy, efficiency and flexibility of Bitcoin transactions.
 
@@ -10,13 +8,24 @@ Schnorr signatures are 64 bytes long instead of the 72 bytes used by current ECD
 
 With the adoption of Taproot and Schnorr, Bitcoin transactions can be more efficient, flexible, and private.
 
-We'll go over two examples. In our first example, we will create a pay-to-taproot(p2tr) address that will lock funds to a key and create a spend transaction for it. In our second example, we will jump straight into taproot script-spend transactions, we will create a Taptree consisting of two script-spend paths, a hash-lock script spend path and a pay-to-pubkey script spend path. We will create transactions that spend from both paths.
+We'll go over two examples. In our first example, we will create a pay-to-taproot(p2tr) address that will lock funds to a key and create a spend transaction for it. In our second example, we will jump straight into taproot script-spend transactions, we will create a Taptree consisting of two script-spend paths, a pay-to-pubkey script spend path and a hash-lock script spend path. We will create transactions that spend from both paths. Finally, we will create a fourth transaction that spends the hash-lock script without using the script tree.
 
 We'll be using Regtest provided by [Nigiri](https://github.com/vulpemventures/nigiri).
 
+- [A Guide to creating TapRoot Scripts with bitcoinjs-lib](#a-guide-to-creating-taproot-scripts-with-bitcoinjs-lib)
+  - [Development environment](#development-environment)
+    - [Nigiri](#nigiri)
+    - [Docker](#docker)
+  - [Code](#code)
+    - [Taproot Key-spend transaction](#taproot-key-spend-transaction)
+    - [Taproot Script-spend transaction](#taproot-script-spend-transaction)
+  - [Conclusion](#conclusion)
+
+## Development environment
+
 ### Nigiri
 
-Download and install nigiri command line interface:
+Download and install Nigiri command line interface:
 
 ```
 $ curl https://getnigiri.vulpem.com | bash
@@ -32,15 +41,17 @@ This will also install several configurable files, such as `bitcoin.conf` and `e
 >
 > Plan 9: $home/nigiri
 
+### Docker
+
+If you don't have it, [install Docker](https://docs.docker.com/desktop/).
+
 Lauch Docker daemon (Mac OSX)
 
 ```
 $ open -a Docker
 ```
 
-You may want to Manage Docker as a non-root user
-
-If you don't have it, [install Docker](https://docs.docker.com/desktop/).
+You may want to [Manage Docker as a non-root user](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user)
 
 Close and reopen your terminal, then start Bitcoin
 
@@ -48,9 +59,33 @@ Close and reopen your terminal, then start Bitcoin
 $ nigiri start
 ```
 
-That's it, you now have a command line interface that manages a selection of `docker-compose` batteries included to have ready-to-use bitcoin `regtest` development environment, with a bitcoin node, electrum explorer both backend and frontend user interface.
+**Note for users of macOS Monterey an onward**
+
+<details>
+  <summary>Show more...</summary>
+   When trying to start Nigiri, you might get an error similar to the following:
+
+```bash
+Error response from daemon: Ports are not available: listen tcp 0.0.0.0:5000: bind: address already in use
+exit status 1
+```
+
+This is due to AirPlay Receiver using port 5000, conflicting with Esplora trying to run using the very same port.
+
+There are two ways to deal with this issue:
+
+1. Uncheck AirPlay Receiver in `System Preferences → Sharing → AirPlay Receiver`
+2. Change Esplora’s port to something other than 5000. This can be done by changing it in [docker-compose.yml](https://github.com/vulpemventures/nigiri/blob/master/cmd/nigiri/resources/docker-compose.yml#L110) found in your data directory. If you previously tried starting Nigiri getting an error – you might have to run `nigiri stop --delete` before restarting it.
+</details>
+<br />
+
+**That's it.**
+
+You now have a command line interface that manages a selection of `docker-compose` batteries included to have ready-to-use bitcoin `regtest` development environment, with a bitcoin node, electrum explorer both backend and frontend user interface.
 
 Nigiri also offers a JSON HTTP proxy passtrough that adds to the explorer handy endpoints like `/faucet` and automatic block generation when calling the `/tx` pushing a transaction.
+
+## Code
 
 ### Taproot Key-spend transaction
 
@@ -170,7 +205,7 @@ const script_addr = script_p2tr.address ?? '';
 console.log(script_addr);
 ```
 
-You can deposit some test btc into the address using a testnet faucet like testnet-faucet.com/btc-testnet.
+Nigiri deposits some test btc into the address using the regtest faucet.
 
 To spend on any of the leaf scripts, you must present the leafVersion, script and controlBlock for that leaf script. The control block is data required to prove that the leaf script exists in the script tree (merkle proof).
 
@@ -291,6 +326,6 @@ txid = await broadcast(tx.toHex());
 console.log(`Success! Txid is ${txid}`);
 ```
 
-### Conclusion
+## Conclusion
 
 You should now have a better understanding of how to use bitcoinjs-lib to create and spend P2TR (Pay to Taproot) payments. With this knowledge, you are one step closer to leveraging the benefits of Taproot in your Bitcoin transactions, such as improved privacy, scalability, and the ability to create more complex smart contracts.
