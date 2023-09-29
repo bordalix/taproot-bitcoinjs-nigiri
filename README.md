@@ -9,6 +9,7 @@
     - [Taproot Key-spend transaction](#taproot-key-spend-transaction)
     - [Taproot Script-spend transaction](#taproot-script-spend-transaction)
   - [Conclusion](#conclusion)
+  - [Acknowledgements](#acknowledgements)
 
 ## Introduction
 
@@ -332,3 +333,9 @@ console.log(`Success! Txid is ${txid}`);
 ## Conclusion
 
 You should now have a better understanding of how to use bitcoinjs-lib to create and spend P2TR (Pay to Taproot) payments. With this knowledge, you are one step closer to leveraging the benefits of Taproot in your Bitcoin transactions, such as improved privacy, scalability, and the ability to create more complex smart contracts.
+
+## Acknowledgements
+
+Oghenovo Usiwoma for his [article](https://dev.to/eunovo/a-guide-to-creating-taproot-scripts-with-bitcoinjs-lib-4oph) and [repo](https://github.com/Eunovo/taproot-with-bitcoinjs)
+
+[Vulpem Ventures](https://vulpem.com/) for [Nigiri](https://vulpem.com/nigiri.html)
