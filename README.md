@@ -96,13 +96,13 @@ Nigiri also offers a JSON HTTP proxy passtrough that adds to the explorer handy 
 For illustration purposes, we'll use a random keypair:
 
 ```
-const keypair = ECPair.makeRandom({ network });
+const keypair = ECPair.makeRandom({ network })
 ```
 
 We tweak this keypair with our pubkey:
 
 ```
-const tweakedSigner = tweakSigner(keypair, { network });
+const tweakedSigner = tweakSigner(keypair, { network })
 ```
 
 bitcoinjs-lib provides a p2tr function to generate p2tr outputs:
@@ -113,47 +113,55 @@ const p2pktr = payments.p2tr({
   network
 });
 
-const p2pktr_addr = p2pktr.address ?? "";
+const p2pktr_addr = p2pktr.address ?? ""
 
-console.log(p2pktr_addr);
+console.log(`Address generated: ${p2pktr_addr}\n`)
 ```
 
 The `toXOnly` function extracts the x-value of our public key.
 
-We will use Nigiri to automate the faucet.
+We will use Nigiri to automate the faucet:
+
+```
+// instruct Nigiri to send coins to address
+const utxos = await faucetAndWait(p2pktr_addr)
+```
 
 Creating a spend-transaction for this address with bitcoinjs-lib is straightforward:
 
 ```
-const psbt = new Psbt({ network });
+// create psbt
+ const psbt = new Psbt({ network })
 
-psbt.addInput({
-  hash: utxos[0].txid,
-  index: utxos[0].vout,
-  witnessUtxo: { value: utxos[0].value, script: p2pktr.output! },
-  tapInternalKey: toXOnly(keypair.publicKey)
-});
+ psbt.addInput({
+   hash: utxos[0].txid,
+   index: utxos[0].vout,
+   witnessUtxo: { value: utxos[0].value, script: p2pktr.output! },
+   tapInternalKey: toXOnly(keypair.publicKey),
+ })
 
-psbt.addOutput({
-   address: "mohjSavDdQYHRYXcS3uS6ttaHP8amyvX78", // faucet address
-   value: utxos[0].value - 150
-});
+ psbt.addOutput({
+   address: return_address,
+   value: utxos[0].value - 150,
+ })
 
-psbt.signInput(0, tweakedSigner);
+ psbt.signInput(0, tweakedSigner)
 
-psbt.finalizeAllInputs();
+ psbt.finalizeAllInputs()
+
+ // extract transaction from psbt and broadcast
+ await extractAndBroadcast(psbt)
 ```
 
 Extract the transaction and broadcast the transaction hex:
 
 ```
-const tx = psbt.extractTransaction();
-
-console.log(`Broadcasting Transaction Hex: ${tx.toHex()}`);
-
-const txid = await broadcast(tx.toHex());
-
-console.log(`Success! Txid is ${txid}`);
+async function extractAndBroadcast(psbt: Psbt) {
+  const tx = psbt.extractTransaction()
+  console.log(`- Broadcasting Transaction Hex: ${tx.toHex()}`)
+  const txid = await broadcast(tx.toHex())
+  console.log(`- Success! Txid is ${txid}`)
+}
 ```
 
 ### Taproot Script-spend transaction
@@ -171,14 +179,20 @@ const hash_lock_keypair = ECPair.makeRandom({ network });
 Now, we will construct our hash-lock script:
 
 ```
-const secret_bytes = Buffer.from('SECRET');
+const secret_bytes = Buffer.from('SECRET')
 
-const hash = crypto.hash160(secret_bytes);
+const hash = crypto.hash160(secret_bytes)
 
-// Construct script to pay to hash_lock_keypair if the correct preimage/secret is provided
-const hash_script_asm = `OP_HASH160 ${hash.toString('hex')} OP_EQUALVERIFY ${toXOnly(hash_lock_keypair.publicKey).toString('hex')} OP_CHECKSIG`;
+// Construct script to pay to hash_lock_keypair if the correct preimagesecret is provided
+const hash_script_asm = [
+  'OP_HASH160',
+  hash.toString('hex'),
+  'OP_EQUALVERIFY',
+  toXOnly(hash_lock_keypair.publicKey).toString('hex'),
+  'OP_CHECKSIG',
+].join(' ')
 
-const hash_lock_script = script.fromASM(hash_script_asm);
+const hash_lock_script = script.fromASM(hash_script_asm)
 ```
 
 Notice that script still requires a signature to unlock funds.
@@ -186,8 +200,13 @@ Notice that script still requires a signature to unlock funds.
 The pay-to-pubkey spend path is much simpler:
 
 ```
-const p2pk_script_asm = `${toXOnly(keypair.publicKey).toString('hex')} OP_CHECKSIG`;
-const p2pk_script = script.fromASM(p2pk_script_asm);
+// Construct script to pay to pubkey
+const p2pk_script_asm = [
+  toXOnly(keypair.publicKey).toString('hex'),
+  'OP_CHECKSIG',
+].join(' ')
+
+const p2pk_script = script.fromASM(p2pk_script_asm)
 ```
 
 We can now create our Taptree and p2tr address:
@@ -196,20 +215,24 @@ We can now create our Taptree and p2tr address:
 const scriptTree: Taptree = [
   { output: hash_lock_script },
   { output: p2pk_script },
-];
+]
 
 const script_p2tr = payments.p2tr({
   internalPubkey: toXOnly(keypair.publicKey),
   scriptTree,
-  network
-});
+  network,
+})
 
-const script_addr = script_p2tr.address ?? '';
+const script_addr = script_p2tr.address ?? ''
 
-console.log(script_addr);
+console.log(`Address generated: ${script_addr}\n`)
 ```
 
-Nigiri deposits some test btc into the address using the regtest faucet.
+Nigiri deposits some test btc into the address using the regtest faucet:
+
+```
+let utxos = await faucetAndWait(script_addr)
+```
 
 To spend on any of the leaf scripts, you must present the leafVersion, script and controlBlock for that leaf script. The control block is data required to prove that the leaf script exists in the script tree (merkle proof).
 
@@ -219,34 +242,29 @@ bitcoinjs-lib will generate the control block for us:
 const hash_lock_redeem = {
   output: hash_lock_script,
   redeemVersion: 192,
-};
+}
 
 const p2pk_redeem = {
   output: p2pk_script,
-  redeemVersion: 192
+  redeemVersion: 192,
 }
 
 const p2pk_p2tr = payments.p2tr({
   internalPubkey: toXOnly(keypair.publicKey),
   scriptTree,
   redeem: p2pk_redeem,
-  network
-});
+  network,
+})
 
 const hash_lock_p2tr = payments.p2tr({
   internalPubkey: toXOnly(keypair.publicKey),
   scriptTree,
   redeem: hash_lock_redeem,
-  network
-});
+  network,
+})
 
-console.log(`Waiting till UTXO is detected at this Address: ${script_addr}`);
-
-let utxos = await waitUntilUTXO(script_addr)
-
-console.log(`Trying the P2PK path with UTXO ${utxos[0].txid}:${utxos[0].vout}`);
-
-const p2pk_psbt = new Psbt({ network });
+// create PSBT
+const p2pk_psbt = new Psbt({ network })
 
 p2pk_psbt.addInput({
   hash: utxos[0].txid,
@@ -256,26 +274,22 @@ p2pk_psbt.addInput({
     {
       leafVersion: p2pk_redeem.redeemVersion,
       script: p2pk_redeem.output,
-      controlBlock: p2pk_p2tr.witness![p2pk_p2tr.witness!.length -  1] // extract control block from witness data
-    }
-  ]
-});
+      controlBlock: p2pk_p2tr.witness![p2pk_p2tr.witness!.length - 1],
+    },
+  ],
+})
 
 p2pk_psbt.addOutput({
-  address: "mohjSavDdQYHRYXcS3uS6ttaHP8amyvX78", // faucet address
-  value: utxos[0].value - 150
-});
+  address: return_address,
+  value: utxos[0].value - 150,
+})
 
-p2pk_psbt.signInput(0, keypair);
-p2pk_psbt.finalizeAllInputs();
+// sign and finalize
+p2pk_psbt.signInput(0, keypair)
+p2pk_psbt.finalizeAllInputs()
 
-let tx = p2pk_psbt.extractTransaction();
-
-console.log(`Broadcasting Transaction Hex: ${tx.toHex()}`);
-
-let txid = await broadcast(tx.toHex());
-
-console.log(`Success! Txid is ${txid}`);
+// extract transaction from psbt and broadcast
+await extractAndBroadcast(p2pk_psbt)
 ```
 
 To spend using the hash-lock leaf script, we have to create a custom finalizer function. In our custom finalizer, we will create our witness stack of signature, preimage, original hash-lock script and our control block:
@@ -284,50 +298,44 @@ To spend using the hash-lock leaf script, we have to create a custom finalizer f
 const tapLeafScript = {
   leafVersion: hash_lock_redeem.redeemVersion,
   script: hash_lock_redeem.output,
-  controlBlock: hash_lock_p2tr.witness![hash_lock_p2tr.witness!.length - 1]
-};
+  controlBlock: hash_lock_p2tr.witness![hash_lock_p2tr.witness!.length - 1],
+}
 
-const psbt = new Psbt({ network });
+// create psbt
+const psbt = new Psbt({ network })
+
 psbt.addInput({
   hash: utxos[0].txid,
   index: utxos[0].vout,
   witnessUtxo: { value: utxos[0].value, script: hash_lock_p2tr.output! },
-  tapLeafScript: [
-    tapLeafScript
-  ]
-});
+  tapLeafScript: [tapLeafScript],
+})
 
 psbt.addOutput({
-  address: "mohjSavDdQYHRYXcS3uS6ttaHP8amyvX78", // faucet address
-  value: utxos[0].value - 150
-});
+  address: return_address,
+  value: utxos[0].value - 150,
+})
 
-psbt.signInput(0, hash_lock_keypair);
+// sign input
+psbt.signInput(0, hash_lock_keypair)
 
 // We have to construct our witness script in a custom finalizer
-
 const customFinalizer = (_inputIndex: number, input: any) => {
-  const scriptSolution = [
-    input.tapScriptSig[0].signature,
-    secret_bytes
-  ];
+  const scriptSolution = [input.tapScriptSig[0].signature, secret_bytes]
   const witness = scriptSolution
     .concat(tapLeafScript.script)
-    .concat(tapLeafScript.controlBlock);
+    .concat(tapLeafScript.controlBlock)
+
   return {
-    finalScriptWitness: witnessStackToScriptWitness(witness)
+    finalScriptWitness: witnessStackToScriptWitness(witness),
   }
 }
 
-psbt.finalizeInput(0, customFinalizer);
+// finalize input
+psbt.finalizeInput(0, customFinalizer)
 
-tx = psbt.extractTransaction();
-
-console.log(`Broadcasting Transaction Hex: ${tx.toHex()}`);
-
-txid = await broadcast(tx.toHex());
-
-console.log(`Success! Txid is ${txid}`);
+// extract transaction from psbt and broadcast
+await extractAndBroadcast(psbt)
 ```
 
 ## Conclusion

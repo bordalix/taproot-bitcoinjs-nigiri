@@ -81,8 +81,8 @@ async function start_p2pktr(keypair: Signer) {
     value: utxos[0].value - 150,
   })
 
-  // sign and finalize
   psbt.signInput(0, tweakedSigner)
+
   psbt.finalizeAllInputs()
 
   // extract transaction from psbt and broadcast
@@ -101,6 +101,7 @@ async function start_taptree(keypair: Signer) {
   const hash_lock_keypair = ECPair.makeRandom({ network })
 
   const secret_bytes = Buffer.from('SECRET')
+
   const hash = crypto.hash160(secret_bytes)
 
   // Construct script to pay to hash_lock_keypair if the correct preimage/secret is provided
@@ -111,6 +112,7 @@ async function start_taptree(keypair: Signer) {
     toXOnly(hash_lock_keypair.publicKey).toString('hex'),
     'OP_CHECKSIG',
   ].join(' ')
+
   const hash_lock_script = script.fromASM(hash_script_asm)
 
   // Construct script to pay to pubkey
@@ -118,6 +120,7 @@ async function start_taptree(keypair: Signer) {
     toXOnly(keypair.publicKey).toString('hex'),
     'OP_CHECKSIG',
   ].join(' ')
+
   const p2pk_script = script.fromASM(p2pk_script_asm)
 
   const scriptTree: Taptree = [
@@ -188,8 +191,8 @@ async function start_taptree(keypair: Signer) {
     value: utxos[0].value - 150,
   })
 
-  // sign and finalize
   p2pk_psbt.signInput(0, keypair)
+
   p2pk_psbt.finalizeAllInputs()
 
   // extract transaction from psbt and broadcast
