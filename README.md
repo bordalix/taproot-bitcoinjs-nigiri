@@ -1,5 +1,17 @@
 # A Guide to creating TapRoot Scripts with bitcoinjs-lib
 
+- [A Guide to creating TapRoot Scripts with bitcoinjs-lib](#a-guide-to-creating-taproot-scripts-with-bitcoinjs-lib)
+  - [Introduction](#introduction)
+  - [Development environment](#development-environment)
+    - [Nigiri](#nigiri)
+    - [Docker](#docker)
+  - [Code](#code)
+    - [Taproot Key-spend transaction](#taproot-key-spend-transaction)
+    - [Taproot Script-spend transaction](#taproot-script-spend-transaction)
+  - [Conclusion](#conclusion)
+
+## Introduction
+
 Taproot and Schnorr are upgrades to the Bitcoin protocol designed to enhance the privacy, efficiency and flexibility of Bitcoin transactions.
 
 Taproot introduces Taptrees, a feature that reduces the size of transaction data and ensures only necessary information is revealed on the blockchain, thereby preserving privacy. With Taproot, multisig transactions are also more private as unused spending conditions are hidden.
@@ -11,15 +23,6 @@ With the adoption of Taproot and Schnorr, Bitcoin transactions can be more effic
 We'll go over two examples. In our first example, we will create a pay-to-taproot(p2tr) address that will lock funds to a key and create a spend transaction for it. In our second example, we will jump straight into taproot script-spend transactions, we will create a Taptree consisting of two script-spend paths, a pay-to-pubkey script spend path and a hash-lock script spend path. We will create transactions that spend from both paths. Finally, we will create a fourth transaction that spends the hash-lock script without using the script tree.
 
 We'll be using Regtest provided by [Nigiri](https://github.com/vulpemventures/nigiri).
-
-- [A Guide to creating TapRoot Scripts with bitcoinjs-lib](#a-guide-to-creating-taproot-scripts-with-bitcoinjs-lib)
-  - [Development environment](#development-environment)
-    - [Nigiri](#nigiri)
-    - [Docker](#docker)
-  - [Code](#code)
-    - [Taproot Key-spend transaction](#taproot-key-spend-transaction)
-    - [Taproot Script-spend transaction](#taproot-script-spend-transaction)
-  - [Conclusion](#conclusion)
 
 ## Development environment
 
