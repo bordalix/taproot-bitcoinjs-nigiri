@@ -3,8 +3,9 @@
 - [A Guide to creating TapRoot Scripts with bitcoinjs-lib](#a-guide-to-creating-taproot-scripts-with-bitcoinjs-lib)
   - [Introduction](#introduction)
   - [Development environment](#development-environment)
-    - [Nigiri](#nigiri)
     - [Docker](#docker)
+    - [Nigiri](#nigiri)
+    - [Run](#run)
   - [Code](#code)
     - [Taproot Key-spend transaction](#taproot-key-spend-transaction)
     - [Taproot Script-spend transaction](#taproot-script-spend-transaction)
@@ -27,24 +28,6 @@ We'll be using Regtest provided by [Nigiri](https://github.com/vulpemventures/ni
 
 ## Development environment
 
-### Nigiri
-
-Download and install Nigiri command line interface:
-
-```
-$ curl https://getnigiri.vulpem.com | bash
-```
-
-This will also install several configurable files, such as `bitcoin.conf` and `elements.conf`, that can be edited. These can be found browsing the following directory:
-
-> POSIX (Linux/BSD): ~/.nigiri
->
-> macOS: $HOME/Library/Application\ Support/Nigiri
->
-> Windows: %LOCALAPPDATA%\Nigiri
->
-> Plan 9: $home/nigiri
-
 ### Docker
 
 If you don't have it, [install Docker](https://docs.docker.com/desktop/).
@@ -55,39 +38,29 @@ Lauch Docker daemon (Mac OSX)
 $ open -a Docker
 ```
 
-You may want to [Manage Docker as a non-root user](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user)
+### Nigiri
 
-Close and reopen your terminal, then start Bitcoin
+If you don't have it, [install Nigiri](https://github.com/vulpemventures/nigiri)
+
+Start Nigiri
 
 ```
 $ nigiri start
 ```
 
-**Note for users of macOS Monterey an onward**
+### Run
 
-<details>
-  <summary>Show more...</summary>
-   When trying to start Nigiri, you might get an error similar to the following:
+Install dependencies (only first time)
 
-```bash
-Error response from daemon: Ports are not available: listen tcp 0.0.0.0:5000: bind: address already in use
-exit status 1
+```
+$ yarn
 ```
 
-This is due to AirPlay Receiver using port 5000, conflicting with Esplora trying to run using the very same port.
+and then
 
-There are two ways to deal with this issue:
-
-1. Uncheck AirPlay Receiver in `System Preferences → Sharing → AirPlay Receiver`
-2. Change Esplora’s port to something other than 5000. This can be done by changing it in [docker-compose.yml](https://github.com/vulpemventures/nigiri/blob/master/cmd/nigiri/resources/docker-compose.yml#L110) found in your data directory. If you previously tried starting Nigiri getting an error – you might have to run `nigiri stop --delete` before restarting it.
-</details>
-<br />
-
-**That's it.**
-
-You now have a command line interface that manages a selection of `docker-compose` batteries included to have ready-to-use bitcoin `regtest` development environment, with a bitcoin node, electrum explorer both backend and frontend user interface.
-
-Nigiri also offers a JSON HTTP proxy passtrough that adds to the explorer handy endpoints like `/faucet` and automatic block generation when calling the `/tx` pushing a transaction.
+```
+$ yarn start
+```
 
 ## Code
 
@@ -338,12 +311,38 @@ psbt.finalizeInput(0, customFinalizer)
 await extractAndBroadcast(psbt)
 ```
 
+Finally, we'll use the hash lock spend path without using the script tree:
+
+```
+const key_spend_psbt = new Psbt({ network })
+
+key_spend_psbt.addInput({
+  hash: utxos[0].txid,
+  index: utxos[0].vout,
+  witnessUtxo: { value: utxos[0].value, script: script_p2tr.output! },
+  tapInternalKey: toXOnly(keypair.publicKey),
+  tapMerkleRoot: script_p2tr.hash,
+})
+
+key_spend_psbt.addOutput({
+  address: return_address,
+  value: utxos[0].value - 150,
+})
+
+// We need to create a signer tweaked by script tree's merkle root
+const tweakedSigner = tweakSigner(keypair, { tweakHash: script_p2tr.hash })
+key_spend_psbt.signInput(0, tweakedSigner)
+key_spend_psbt.finalizeAllInputs()
+
+await extractAndBroadcast(key_spend_psbt)
+```
+
 ## Conclusion
 
 You should now have a better understanding of how to use bitcoinjs-lib to create and spend P2TR (Pay to Taproot) payments. With this knowledge, you are one step closer to leveraging the benefits of Taproot in your Bitcoin transactions, such as improved privacy, scalability, and the ability to create more complex smart contracts.
 
 ## Acknowledgements
 
-Oghenovo Usiwoma for his [article](https://dev.to/eunovo/a-guide-to-creating-taproot-scripts-with-bitcoinjs-lib-4oph) and [repo](https://github.com/Eunovo/taproot-with-bitcoinjs)
+Oghenovo Usiwoma for [his article](https://dev.to/eunovo/a-guide-to-creating-taproot-scripts-with-bitcoinjs-lib-4oph) and [original repo](https://github.com/Eunovo/taproot-with-bitcoinjs)
 
 [Vulpem Ventures](https://vulpem.com/) for [Nigiri](https://vulpem.com/nigiri.html)
