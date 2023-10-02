@@ -1,10 +1,22 @@
 import axios, { AxiosResponse } from 'axios'
 
+export interface IUTXO {
+  txid: string
+  vout: number
+  status: {
+    confirmed: boolean
+    block_height: number
+    block_hash: string
+    block_time: number
+  }
+  value: number
+}
+
 const nigiri = new axios.Axios({
   baseURL: `http://localhost:3000`,
 })
 
-export async function waitUntilUTXO(address: string) {
+export const waitUntilUTXO = async (address: string) => {
   return new Promise<IUTXO[]>((resolve, reject) => {
     let intervalId: any
     const checkForUtxo = async () => {
@@ -28,19 +40,7 @@ export async function waitUntilUTXO(address: string) {
   })
 }
 
-export async function broadcast(txHex: string) {
+export const broadcast = async (txHex: string) => {
   const response: AxiosResponse<string> = await nigiri.post('/tx', txHex)
   return response.data
-}
-
-interface IUTXO {
-  txid: string
-  vout: number
-  status: {
-    confirmed: boolean
-    block_height: number
-    block_hash: string
-    block_time: number
-  }
-  value: number
 }

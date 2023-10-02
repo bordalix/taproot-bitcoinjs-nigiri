@@ -7,7 +7,7 @@ import {
   crypto,
   Psbt,
 } from 'bitcoinjs-lib'
-import { broadcast, waitUntilUTXO } from './nigiri_utils'
+import { IUTXO, broadcast, waitUntilUTXO } from './nigiri_utils'
 import { ECPairFactory, ECPairAPI, TinySecp256k1Interface } from 'ecpair'
 import { Taptree } from 'bitcoinjs-lib/src/types'
 import { witnessStackToScriptWitness } from './witness_stack_to_script_witness'
@@ -19,29 +19,67 @@ const ECPair: ECPairAPI = ECPairFactory(tinysecp)
 const network = networks.regtest
 const return_address = 'bcrt1q8p2msjye6yjarq9qcflv2t0stp3qtwtp24ehpf'
 
-async function extractAndBroadcast(psbt: Psbt) {
+const tweakSigner = (signer: Signer, opts: any = {}): Signer => {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  let privateKey: Uint8Array | undefined = signer.privateKey!
+  if (!privateKey) {
+    throw new Error('Private key is required for tweaking signer!')
+  }
+  if (signer.publicKey[0] === 3) {
+    privateKey = tinysecp.privateNegate(privateKey)
+  }
+
+  const tweakedPrivateKey = tinysecp.privateAdd(
+    privateKey,
+    tapTweakHash(toXOnly(signer.publicKey), opts.tweakHash)
+  )
+  if (!tweakedPrivateKey) {
+    throw new Error('Invalid tweaked private key!')
+  }
+
+  return ECPair.fromPrivateKey(Buffer.from(tweakedPrivateKey), {
+    network: opts.network,
+  })
+}
+
+const tapTweakHash = (pubKey: Buffer, h: Buffer | undefined): Buffer => {
+  return crypto.taggedHash(
+    'TapTweak',
+    Buffer.concat(h ? [pubKey, h] : [pubKey])
+  )
+}
+
+const toXOnly = (pubkey: Buffer): Buffer => {
+  return pubkey.subarray(1, 33)
+}
+
+const extractAndBroadcast = async (psbt: Psbt): Promise<void> => {
   const tx = psbt.extractTransaction()
-  console.log(`- Broadcasting Transaction Hex: ${tx.toHex()}`)
-  const txid = await broadcast(tx.toHex())
+  const hex = tx.toHex()
+  const length = tx.toHex().length / 2
+  console.log(`- Broadcasting Transaction Hex (${length} bytes): ${hex}`)
+  const txid = await broadcast(hex)
   console.log(`- Success! Txid is ${txid}`)
 }
 
-async function faucetAndWait(address: string) {
+const faucetAndWait = async (address: string): Promise<IUTXO[]> => {
   console.log('- Sending some funds with Nigiri')
   exec(`nigiri faucet ${address}`)
-  console.log('- Waiting till UTXO is detected')
+  console.log('- Waiting until UTXO is detected')
   let utxos = await waitUntilUTXO(address)
   console.log(`- UTXO found: ${utxos[0].txid}:${utxos[0].vout}`)
   return utxos
 }
 
-async function start() {
+const start = async () => {
   const keypair = ECPair.makeRandom({ network })
   await start_p2pktr(keypair)
   await start_taptree(keypair)
+  console.log('\nTip: use http://localhost:300/tx/<txid> to inspect tx')
 }
 
-async function start_p2pktr(keypair: Signer) {
+const start_p2pktr = async (keypair: Signer) => {
   console.log('Taproot Key-spend transaction\n')
 
   // Tweak the original keypair
@@ -89,7 +127,7 @@ async function start_p2pktr(keypair: Signer) {
   await extractAndBroadcast(psbt)
 }
 
-async function start_taptree(keypair: Signer) {
+const start_taptree = async (keypair: Signer) => {
   // TapTree example
   console.log('\nTaproot Script-spend transaction\n')
 
@@ -283,38 +321,3 @@ async function start_taptree(keypair: Signer) {
 }
 
 start().then(() => process.exit())
-
-function tweakSigner(signer: Signer, opts: any = {}): Signer {
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore
-  let privateKey: Uint8Array | undefined = signer.privateKey!
-  if (!privateKey) {
-    throw new Error('Private key is required for tweaking signer!')
-  }
-  if (signer.publicKey[0] === 3) {
-    privateKey = tinysecp.privateNegate(privateKey)
-  }
-
-  const tweakedPrivateKey = tinysecp.privateAdd(
-    privateKey,
-    tapTweakHash(toXOnly(signer.publicKey), opts.tweakHash)
-  )
-  if (!tweakedPrivateKey) {
-    throw new Error('Invalid tweaked private key!')
-  }
-
-  return ECPair.fromPrivateKey(Buffer.from(tweakedPrivateKey), {
-    network: opts.network,
-  })
-}
-
-function tapTweakHash(pubKey: Buffer, h: Buffer | undefined): Buffer {
-  return crypto.taggedHash(
-    'TapTweak',
-    Buffer.concat(h ? [pubKey, h] : [pubKey])
-  )
-}
-
-function toXOnly(pubkey: Buffer): Buffer {
-  return pubkey.subarray(1, 33)
-}
