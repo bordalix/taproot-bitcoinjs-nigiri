@@ -26,6 +26,12 @@ We'll go over two examples. In our first example, we will create a pay-to-taproo
 
 We'll be using Regtest provided by [Nigiri](https://github.com/vulpemventures/nigiri).
 
+Nigiri is a local regtest development box for Bitcoin and Liquid:
+
+- Run Bitcoin and Liquid in regtest mode
+- Electrs and Esplora for easy development
+- Faucet, mint and broadcast with a command
+
 ## Development environment
 
 ### Docker
@@ -311,7 +317,7 @@ psbt.finalizeInput(0, customFinalizer)
 await extractAndBroadcast(psbt)
 ```
 
-Finally, we'll use the hash lock spend path without using the script tree:
+Finally, we'll use the hash lock spend path without using the script tree. The main advantage is the transaction will be much smaller in size (150 vs 281 bytes and 396 vs 527 weight):
 
 ```
 const key_spend_psbt = new Psbt({ network })
